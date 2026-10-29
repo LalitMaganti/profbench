@@ -23,6 +23,7 @@ config("default") {
   }
   cflags += [ "-O$optimize_level" ]
   cflags_cc = [ "-std=c++20" ]
+  include_dirs = [ "//" ]
   ldflags = [
     "--sysroot=$_sysroot",
     "-fuse-ld=lld",
