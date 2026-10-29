@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Fetches the pinned build dependencies into buildtools/.
+
+Modelled on Perfetto's tools/install-build-deps. Files and archives are checked
+against their SHA-256 and git sources are pinned to a commit. Nothing is built
+here: the GN build compiles sources such as libc++. Re-running is a no-op once
+everything is up to date.
+"""
+
+import hashlib
+import shutil
+import subprocess
+import sys
+import tarfile
+import urllib.request
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+@dataclass
+class Dependency:
+    # Relative to the repo root. A .tgz or .zip target is extracted into the
+    # same path without the extension.
+    target_folder: str
+    # A URL ending in .git is a git source; anything else is downloaded.
+    source_url: str
+    # The commit for git sources, the SHA-256 for downloads.
+    checksum: str
+
+
+BUILD_DEPS = [
+    Dependency(
+        'buildtools/zig.tgz',
+        'https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz',
+        '1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026'),
+
+    # The toolchain and libc++ revisions below match Perfetto's
+    # tools/install-build-deps, which keeps them in sync with Chrome.
+    Dependency(
+        'buildtools/linux64/clang.tgz',
+        'https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-llvmorg-23-init-19482-g53d18800-22.tar.xz',
+        'a1f881d528ffd8f67a752cdcbad35595dafcf89c177b33931ec2c802280392e1'),
+    # From Chromium's build/linux/sysroot_scripts/sysroots.json.
+    Dependency(
+        'buildtools/debian_bullseye_amd64-sysroot.tgz',
+        'https://commondatastorage.googleapis.com/chrome-linux-sysroot/f851add76bdae472fb6c94b4f920bc4a132d85ac607951391297f636af7e934e',
+        'f851add76bdae472fb6c94b4f920bc4a132d85ac607951391297f636af7e934e'),
+    Dependency(
+        'buildtools/linux64/gn.zip',
+        'https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/git_revision:127dd2a6d582528d6d61c4d838dc17385ef31abd',
+        '2529a6e618be13d05b761a1b5b5e2f0c8bd3e5c592d0c8bf16afed12b6314f12'),
+    Dependency(
+        'buildtools/linux64/ninja',
+        'https://storage.googleapis.com/perfetto/ninja-linux64-182',
+        '54ac6a01362190aaabf4cf276f9c8982cdf11b225438940fdde3339be0f2ecdc'),
+    Dependency(
+        'buildtools/libcxx',
+        'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxx.git',
+        '852bc6746f45add53fec19f3a29280e69e358d44'),
+    Dependency(
+        'buildtools/libcxxabi',
+        'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxxabi.git',
+        'a37a3aa431f132b02a58656f13984d51098330a2'),
+    Dependency(
+        'buildtools/libunwind',
+        'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libunwind.git',
+        '419b03c0b8f20d6da9ddcb0d661a94a97cdd7dad'),
+]
+
+
+def stamp_path(dep):
+    return ROOT / (dep.target_folder + '.stamp')
+
+
+def is_up_to_date(dep):
+    stamp = stamp_path(dep)
+    return stamp.exists() and stamp.read_text().strip() == dep.checksum
+
+
+def sha256_of(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def extract(archive, dest):
+    shutil.rmtree(dest, ignore_errors=True)
+    tmp = dest.with_name(dest.name + '.extract')
+    shutil.rmtree(tmp, ignore_errors=True)
+    if zipfile.is_zipfile(archive):
+        with zipfile.ZipFile(archive) as z:
+            z.extractall(tmp)
+        for f in tmp.rglob('*'):
+            f.chmod(f.stat().st_mode | 0o755)
+    else:
+        with tarfile.open(archive) as t:
+            t.extractall(tmp, filter='data')
+    # Drop a single top-level directory, as in the Zig release tarballs.
+    entries = list(tmp.iterdir())
+    if len(entries) == 1 and entries[0].is_dir():
+        entries[0].rename(dest)
+        tmp.rmdir()
+    else:
+        tmp.rename(dest)
+
+
+def fetch_download(dep):
+    target = ROOT / dep.target_folder
+    target.parent.mkdir(parents=True, exist_ok=True)
+    download = target.with_name(target.name + '.download')
+    with urllib.request.urlopen(dep.source_url) as r, open(download, 'wb') as f:
+        shutil.copyfileobj(r, f)
+    actual = sha256_of(download)
+    if actual != dep.checksum:
+        download.unlink()
+        sys.exit(f'{dep.target_folder}: SHA-256 mismatch: expected {dep.checksum}, got {actual}')
+    if target.suffix in ('.tgz', '.zip'):
+        extract(download, target.with_suffix(''))
+        download.unlink()
+    else:
+        download.chmod(0o755)
+        download.rename(target)
+
+
+def fetch_git(dep):
+    target = ROOT / dep.target_folder
+    shutil.rmtree(target, ignore_errors=True)
+    target.mkdir(parents=True)
+
+    def git(*args):
+        subprocess.run(['git', '-C', str(target), *args], check=True)
+
+    git('init', '-q')
+    git('fetch', '-q', '--depth', '1', dep.source_url, dep.checksum)
+    git('checkout', '-q', dep.checksum)
+
+
+def main():
+    for dep in BUILD_DEPS:
+        if is_up_to_date(dep):
+            print(f'{dep.target_folder}: up to date')
+            continue
+        print(f'{dep.target_folder}: fetching {dep.source_url}')
+        if dep.source_url.endswith('.git'):
+            fetch_git(dep)
+        else:
+            fetch_download(dep)
+        stamp_path(dep).write_text(dep.checksum + '\n')
+
+
+if __name__ == '__main__':
+    main()

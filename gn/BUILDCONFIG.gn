@@ -1,0 +1,26 @@
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+declare_args() {
+  is_debug = false
+
+  # Build workloads and the C++ runtime with frame pointers.
+  enable_frame_pointers = true
+}
+
+_default_configs = [
+  "//gn:default",
+  "//gn:libc++",
+]
+
+set_defaults("executable") {
+  configs = _default_configs
+}
+set_defaults("source_set") {
+  configs = _default_configs
+}
+set_defaults("static_library") {
+  configs = _default_configs
+}
+
+set_default_toolchain("//gn/toolchain:clang")

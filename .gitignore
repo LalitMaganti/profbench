@@ -1,0 +1,6 @@
+out/
+
+# Fetched by tools/install-build-deps.
+/buildtools/*
+!/buildtools/BUILD.gn
+!/buildtools/libcxx_config/
