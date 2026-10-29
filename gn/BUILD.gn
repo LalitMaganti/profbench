@@ -1,0 +1,58 @@
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+_sysroot = rebase_path("//buildtools/debian_bullseye_amd64-sysroot", root_build_dir)
+
+config("default") {
+  cflags = [
+    "--sysroot=$_sysroot",
+    "-g",
+    "-Wall",
+    "-Wextra",
+  ]
+  if (enable_frame_pointers) {
+    # Applies to libc++ too, so frame-pointer unwinders can walk through the
+    # C++ runtime.
+    cflags += [
+      "-fno-omit-frame-pointer",
+      "-mno-omit-leaf-frame-pointer",
+    ]
+  } else {
+    cflags += [ "-fomit-frame-pointer" ]
+  }
+  if (is_debug) {
+    cflags += [ "-O0" ]
+  } else {
+    cflags += [ "-O2" ]
+  }
+  cflags_cc = [ "-std=c++20" ]
+  ldflags = [
+    "--sysroot=$_sysroot",
+    "-fuse-ld=lld",
+    "-pthread",
+
+    # Unwinding comes from our libunwind, not the host's libgcc_s.
+    "-unwindlib=none",
+  ]
+}
+
+# Builds against the pinned libc++ in buildtools/ rather than the host's
+# C++ library. Mirrors Perfetto's gn/standalone/libc++/BUILD.gn.
+config("libc++") {
+  defines = [
+    "_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS",
+    "_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS",
+  ]
+  cflags_cc = [
+    "-nostdinc++",
+    "-isystem" + rebase_path("//buildtools/libcxx/include", root_build_dir),
+    "-isystem" + rebase_path("//buildtools/libcxxabi/include", root_build_dir),
+  ]
+  include_dirs = [ "//buildtools/libcxx_config" ]
+  ldflags = [ "-nostdlib++" ]
+  libs = [ "dl" ]
+}
+
+group("libc++deps") {
+  public_deps = [ "//buildtools:libc++" ]
+}

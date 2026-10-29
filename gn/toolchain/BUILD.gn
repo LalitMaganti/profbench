@@ -1,0 +1,59 @@
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+_bin = rebase_path("//buildtools/linux64/clang/bin", root_build_dir)
+_cc = "$_bin/clang"
+_cxx = "$_bin/clang++"
+_ar = "$_bin/llvm-ar"
+
+toolchain("clang") {
+  tool("cc") {
+    depfile = "{{output}}.d"
+    command = "$_cc -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_c}} -c {{source}} -o {{output}}"
+    depsformat = "gcc"
+    outputs =
+        [ "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.o" ]
+    description = "CC {{output}}"
+  }
+  tool("cxx") {
+    depfile = "{{output}}.d"
+    command = "$_cxx -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
+    depsformat = "gcc"
+    outputs =
+        [ "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.o" ]
+    description = "CXX {{output}}"
+  }
+  tool("asm") {
+    depfile = "{{output}}.d"
+    command = "$_cc -MMD -MF $depfile {{defines}} {{include_dirs}} {{asmflags}} -c {{source}} -o {{output}}"
+    depsformat = "gcc"
+    outputs =
+        [ "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.o" ]
+    description = "ASM {{output}}"
+  }
+  tool("alink") {
+    rspfile = "{{output}}.rsp"
+    rspfile_content = "{{inputs}}"
+    command = "rm -f {{output}} && $_ar rcsD {{output}} @$rspfile"
+    outputs = [ "{{target_out_dir}}/{{target_output_name}}{{output_extension}}" ]
+    default_output_extension = ".a"
+    output_prefix = "lib"
+    description = "AR {{output}}"
+  }
+  tool("link") {
+    exe = "{{root_out_dir}}/{{target_output_name}}{{output_extension}}"
+    rspfile = "$exe.rsp"
+    rspfile_content = "{{inputs}}"
+    command = "$_cxx {{ldflags}} @$rspfile {{solibs}} {{libs}} -o $exe"
+    outputs = [ exe ]
+    description = "LINK $exe"
+  }
+  tool("stamp") {
+    command = "touch {{output}}"
+    description = "STAMP {{output}}"
+  }
+  tool("copy") {
+    command = "cp -af {{source}} {{output}}"
+    description = "COPY {{source}} {{output}}"
+  }
+}

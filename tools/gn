@@ -1,0 +1,5 @@
+#!/bin/sh
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+exec "$(dirname "$0")/../buildtools/linux64/gn/gn" "$@"
