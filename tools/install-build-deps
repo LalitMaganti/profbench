@@ -71,6 +71,12 @@ BUILD_DEPS = [
         'buildtools/libunwind',
         'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libunwind.git',
         '419b03c0b8f20d6da9ddcb0d661a94a97cdd7dad'),
+
+    # Conformance tests for the harness's TOML parser (v2.2.0).
+    Dependency(
+        'buildtools/toml-test',
+        'https://github.com/toml-lang/toml-test.git',
+        'ce08da1ddb075d1c7596d663c7fcba9a2ae02c5c'),
 ]
 
 

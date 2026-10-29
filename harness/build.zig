@@ -7,10 +7,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
 
-    // The generic CLI library, kept as its own module so it cannot depend on
+    // Generic libraries, kept as their own modules so they cannot depend on
     // the rest of the harness.
     const cli = b.createModule(.{
         .root_source_file = b.path("src/cli/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const toml = b.createModule(.{
+        .root_source_file = b.path("src/toml/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -27,7 +32,19 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     const test_step = b.step("test", "Run the harness unit tests");
-    for ([_]*std.Build.Module{ cli, exe.root_module }) |m| {
+    for ([_]*std.Build.Module{ cli, toml, exe.root_module }) |m| {
         test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = m })).step);
     }
+
+    // The TOML parser's conformance tests, against the suite fetched by
+    // tools/install-build-deps.
+    const options = b.addOptions();
+    options.addOption([]const u8, "toml_test_dir", b.root.joinString(b.allocator, "../buildtools/toml-test/tests") catch @panic("OOM"));
+    const conformance = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("src/toml/conformance_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "build_options", .module = options.createModule() }},
+    }) });
+    test_step.dependOn(&b.addRunArtifact(conformance).step);
 }
