@@ -1,0 +1,15 @@
+#!/bin/sh
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+# Builds the workloads with GN and ninja and the harness with Zig, all into
+# one output directory (default out/linux).
+set -eu
+cd "$(dirname "$0")/.."
+out="${1:-out/linux}"
+
+# Generate only once so `tools/gn args` changes are kept; ninja regenerates
+# the build files itself when they change.
+[ -f "$out/build.ninja" ] || tools/gn gen "$out"
+tools/ninja -C "$out"
+(cd harness && ../buildtools/zig/zig build --release=safe --prefix "../$out" --cache-dir "../$out/zig-cache")
