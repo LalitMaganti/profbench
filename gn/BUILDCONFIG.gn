@@ -2,11 +2,24 @@
 # SPDX-License-Identifier: Apache-2.0
 
 declare_args() {
-  is_debug = false
+  # The -O level for workloads and the C++ runtime: "0", "1", "2", "3", "s"
+  # or "z". Most production code ships at -O2.
+  optimize_level = "2"
 
   # Build workloads and the C++ runtime with frame pointers.
   enable_frame_pointers = true
 }
+
+assert(filter_include([ optimize_level ],
+                      [
+                        "0",
+                        "1",
+                        "2",
+                        "3",
+                        "s",
+                        "z",
+                      ]) != [],
+       "optimize_level must be one of 0, 1, 2, 3, s or z")
 
 _default_configs = [
   "//gn:default",
@@ -16,9 +29,11 @@ _default_configs = [
 set_defaults("executable") {
   configs = _default_configs
 }
+
 set_defaults("source_set") {
   configs = _default_configs
 }
+
 set_defaults("static_library") {
   configs = _default_configs
 }

@@ -1,7 +1,8 @@
 # Copyright 2026 The Profbench Authors.
 # SPDX-License-Identifier: Apache-2.0
 
-_sysroot = rebase_path("//buildtools/debian_bullseye_amd64-sysroot", root_build_dir)
+_sysroot =
+    rebase_path("//buildtools/debian_bullseye_amd64-sysroot", root_build_dir)
 
 config("default") {
   cflags = [
@@ -20,11 +21,7 @@ config("default") {
   } else {
     cflags += [ "-fomit-frame-pointer" ]
   }
-  if (is_debug) {
-    cflags += [ "-O0" ]
-  } else {
-    cflags += [ "-O2" ]
-  }
+  cflags += [ "-O$optimize_level" ]
   cflags_cc = [ "-std=c++20" ]
   ldflags = [
     "--sysroot=$_sysroot",
