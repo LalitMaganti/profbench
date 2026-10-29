@@ -4,3 +4,4 @@ out/
 /buildtools/*
 !/buildtools/BUILD.gn
 !/buildtools/libcxx_config/
+.zig-cache/
