@@ -1,0 +1,24 @@
+# Copyright 2026 The Profbench Authors.
+# SPDX-License-Identifier: Apache-2.0
+
+group("workloads") {
+  deps = [
+    ":fanout",
+    ":recurse",
+  ]
+}
+
+source_set("common") {
+  sources = [ "common.h" ]
+  public_deps = [ "//gn:libc++deps" ]
+}
+
+executable("recurse") {
+  sources = [ "recurse.cc" ]
+  deps = [ ":common" ]
+}
+
+executable("fanout") {
+  sources = [ "fanout.cc" ]
+  deps = [ ":common" ]
+}
